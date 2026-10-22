@@ -31,4 +31,6 @@ public class ItemReport
     public DateTime? UpdatedAt { get; set; }
 
     public ICollection<Claim> Claims { get; set; } = new List<Claim>();
+
+    public Photo? Photo { get; set; }
 }
