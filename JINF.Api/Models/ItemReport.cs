@@ -33,4 +33,10 @@ public class ItemReport
     public ICollection<Claim> Claims { get; set; } = new List<Claim>();
 
     public Photo? Photo { get; set; }
+
+    public DateTime? ReturnedAt { get; set; }
+
+    public string? ReturnedById { get; set; }
+
+    public ApplicationUser? ReturnedBy { get; set; }
 }
