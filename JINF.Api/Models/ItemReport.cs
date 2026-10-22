@@ -6,6 +6,8 @@ public class ItemReport
 
     public string ReporterId { get; set; } = string.Empty;
 
+    public ApplicationUser Reporter { get; set; } = null!;
+
     public ReportType ReportType { get; set; }
 
     public string Title { get; set; } = string.Empty;
@@ -27,4 +29,6 @@ public class ItemReport
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? UpdatedAt { get; set; }
+
+    public ICollection<Claim> Claims { get; set; } = new List<Claim>();
 }
