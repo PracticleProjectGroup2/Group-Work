@@ -1,0 +1,6 @@
+@JINF.Api_HostAddress = http://localhost:5132
+
+GET {{JINF.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
