@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
+
 namespace JINF.Api.Database;
 
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
@@ -30,6 +31,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
                 .HasMaxLength(100)
                 .IsRequired();
         });
+        builder.Entity<ApplicationUser>()
+                .HasIndex(u => u.NormalizedEmail)
+                .IsUnique()
+                .HasDatabaseName("EmailIndex");
 
         builder.Entity<Category>(entity =>
         {
