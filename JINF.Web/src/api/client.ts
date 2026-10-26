@@ -3,8 +3,17 @@ import type { Category, Claim, ItemFilters, ItemReport, Location, NewReport, Sta
 
 // Every page talks to the backend through this file. While VITE_USE_MOCKS is not "false"
 // the functions return sample data from mock.ts, so the UI can be built before the API exists.
-const useMocks = import.meta.env.VITE_USE_MOCKS !== "false";
+export const useMocks = import.meta.env.VITE_USE_MOCKS !== "false";
 const delay = <T>(value: T) => new Promise<T>((r) => setTimeout(() => r(value), 150));
+
+// Fired when the API rejects our token (expired or revoked); AuthContext listens for it.
+export const SESSION_EXPIRED_EVENT = "jinf:session-expired";
+
+export class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
 
 let token: string | null = localStorage.getItem("jinf.token");
 export function setToken(value: string | null) {
@@ -13,17 +22,57 @@ export function setToken(value: string | null) {
   else localStorage.removeItem("jinf.token");
 }
 
+// Turns the error bodies ASP.NET Core sends back into one readable message:
+// ValidationProblemDetails ({ errors: { Field: [..] } }), ProblemDetails ({ title, detail }),
+// Identity errors ([{ description }]) and the API's MessageResponse ({ message }).
+function errorMessage(body: string, status: number): string {
+  try {
+    const data = JSON.parse(body);
+    if (Array.isArray(data)) return data.map((e) => e.description ?? e).join(" ");
+    if (data.errors && typeof data.errors === "object") return Object.values(data.errors).flat().join(" ");
+    if (data.message) return data.message;
+    if (data.detail) return data.detail;
+    if (data.title) return data.title;
+  } catch {
+    if (body.trim()) return body;
+  }
+  if (status === 403) return "You don't have permission to do that.";
+  if (status === 404) return "Not found.";
+  return `Something went wrong (${status}).`;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
 
-  const res = await fetch(`/api${path}`, { ...init, headers });
-  if (!res.ok) throw new Error((await res.text()) || `Request failed (${res.status})`);
-  return res.status === 204 ? (undefined as T) : res.json();
+  let res: Response;
+  try {
+    res = await fetch(`/api${path}`, { ...init, headers });
+  } catch {
+    throw new ApiError(0, "Can't reach the JINF server. Check that the API is running.");
+  }
+
+  const body = await res.text();
+  if (!res.ok) {
+    if (res.status === 401 && token) {
+      setToken(null);
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
+    // The dev proxy answers 500 with an empty body when the API isn't running
+    if (res.status === 500 && !body) throw new ApiError(0, "Can't reach the JINF server. Check that the API is running.");
+    throw new ApiError(res.status, errorMessage(body, res.status));
+  }
+  return (body ? JSON.parse(body) : undefined) as T;
 }
 
 // ---- Auth ----
+
+interface LoginResponse {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+}
 
 export async function login(email: string, password: string): Promise<User> {
   if (useMocks) {
@@ -31,7 +80,8 @@ export async function login(email: string, password: string): Promise<User> {
     setToken("mock-token");
     return delay({ id: isAdmin ? "a1" : "u1", fullName: isAdmin ? "Reception Admin" : "Test Student", email, role: isAdmin ? "Admin" : "User" });
   }
-  const { accessToken } = await request<{ accessToken: string }>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  setToken(null); // a stale token must not turn a failed login into "session expired"
+  const { accessToken } = await request<LoginResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
   setToken(accessToken);
   return me();
 }
