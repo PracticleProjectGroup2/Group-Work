@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-paper: #f4f1ea;
+  --color-card: #fbfaf6;
+  --color-ink: #1d1b18;
+  --color-muted: #6b655c;
+  --color-line: #cfc6b4;
+  --color-tag: #e8a33d;
+  --color-tag-soft: #f3dfb6;
+
+  --color-lost: #a8432c;
+  --color-found: #3d6f4e;
+  --color-claimed: #2f5a85;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .input {
+    width: 100%;
+    border: 1px solid var(--color-line);
+    background: var(--color-card);
+    border-radius: 2px;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.95rem;
+  }
+  .input:focus {
+    outline: 2px solid var(--color-ink);
+    outline-offset: -1px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+    padding: 0.5rem 0.95rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .btn:disabled {
+    opacity: 0.5;
+  }
+  .btn-primary {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .btn-primary:hover {
+    background: #3a362f;
+  }
+  .btn-ghost {
+    border: 1px solid var(--color-ink);
+  }
+  .btn-ghost:hover {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  .link {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
