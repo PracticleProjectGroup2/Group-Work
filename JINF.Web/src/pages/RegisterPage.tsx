@@ -31,13 +31,13 @@ export function RegisterPage() {
     <AuthCard title="Create an account" footer={<>Already registered? <Link to="/login" className="text-ink link">Log in</Link></>}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Full name">
-          <input className="input" required autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <input className="input" required maxLength={100} autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </Field>
         <Field label="Campus email">
-          <input type="email" className="input" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input type="email" className="input" required maxLength={254} autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
-        <Field label="Password" hint="At least 8 characters.">
-          <input type="password" className="input" required minLength={8} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        <Field label="Password" hint="At least 15 characters. A short phrase is easiest to remember.">
+          <input type="password" className="input" required minLength={15} maxLength={128} autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </Field>
 
         {/* POPIA: tell users what is collected and why before they register */}
