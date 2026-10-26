@@ -54,19 +54,6 @@ src/
   pages/        browse, item detail + claim, report, my items, login/register, reception (admin)
 ```
 
-## Endpoints the frontend expects
+## API contract
 
-| Method | Path | Used by |
-|---|---|---|
-| POST | `/api/auth/register`, `/api/auth/login` | Register, Login |
-| GET | `/api/auth/me` | Current user + role |
-| GET | `/api/categories`, `/api/locations` | Forms and filters |
-| GET | `/api/items?q=&type=&categoryId=&locationId=` | Browse |
-| GET | `/api/items/{id}`, `/api/items/mine` | Item page, My items |
-| POST | `/api/items` (multipart, optional photo) | Report |
-| POST | `/api/claims` | Claim an item |
-| GET | `/api/claims/mine`, `/api/claims` | My items, Admin |
-| PUT | `/api/claims/{id}/approve`, `/api/claims/{id}/reject` | Admin |
-| GET | `/api/admin/stats` | Admin dashboard |
-
-Enums are expected as strings (`"Lost"`, `"Open"`, …), so the API needs `JsonStringEnumConverter`.
+The exact requests and JSON responses the frontend expects from `JINF.Api` are in [API_CONTRACT.md](API_CONTRACT.md).

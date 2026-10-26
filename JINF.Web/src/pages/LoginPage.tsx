@@ -1,12 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../auth/AuthContext";
+import { ApiError, useMocks } from "../api/client";
 import { ErrorNote, Field } from "../components/ui";
 
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const from = (useLocation().state as { from?: string } | null)?.from ?? "/";
+  const state = useLocation().state as { from?: string; expired?: boolean } | null;
+  const from = state?.from ?? "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,14 +20,16 @@ export function LoginPage() {
     try {
       await login(email.trim(), password);
       navigate(from, { replace: true });
-    } catch {
-      setError("Incorrect email or password.");
+    } catch (err) {
+      // 401 means wrong credentials; anything else (lockout, server down) has its own message
+      setError(err instanceof ApiError && err.status !== 401 ? err.message : "Incorrect email or password.");
     }
   }
 
   return (
     <AuthCard title="Log in" footer={<>New here? <Link to="/register" className="text-ink link">Create an account</Link></>}>
       <form onSubmit={submit} className="space-y-4">
+        {state?.expired && <p className="text-sm text-muted">Your session expired. Please log in again.</p>}
         <Field label="Campus email">
           <input type="email" className="input" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         </Field>
@@ -34,7 +38,7 @@ export function LoginPage() {
         </Field>
         {error && <ErrorNote message={error} />}
         <button className="btn btn-primary">Log in</button>
-        {import.meta.env.VITE_USE_MOCKS !== "false" && (
+        {useMocks && (
           <p className="text-xs text-muted">Mock mode: any password works. Emails starting with “admin” log in as an administrator.</p>
         )}
       </form>
