@@ -20,6 +20,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddHostedService<LostReportExpiryService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("JWT key is missing.");
@@ -120,11 +121,16 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 
+
 var app = builder.Build();
-// Add a health check endpoint to verify database connectivity
-// Development-only database diagnostic endpoint
+
+// Enable Swagger in Development
 if (app.Environment.IsDevelopment())
 {
+    app.UseSwagger();
+    app.UseSwaggerUI();
+
+    // Development-only database diagnostic endpoint
     app.MapGet("/db-check", async (ApplicationDbContext db) =>
     {
         try
@@ -147,6 +153,11 @@ if (app.Environment.IsDevelopment())
         }
     });
 }
+
+app.MapControllers();
+
+app.Run();
+
 
 app.MapControllers();
 

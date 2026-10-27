@@ -164,6 +164,7 @@ public class AuthService : IAuthService
         };
     }
 
+
     public async Task<UserResponse?> GetCurrentUserAsync(
         string userId,
         CancellationToken cancellationToken = default)
@@ -182,8 +183,12 @@ public class AuthService : IAuthService
             Id = user.Id,
             FullName = user.FullName,
             Email = user.Email ?? "",
-            Role = roles.FirstOrDefault() ?? DefaultRole
+            Role = roles.Contains("Admin")
+                ? "Admin"
+                : roles.FirstOrDefault() ?? DefaultRole,
+            Roles = roles.ToList()
         };
     }
+
 }
 

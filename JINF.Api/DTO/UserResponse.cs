@@ -8,5 +8,7 @@ public class UserResponse
 
     public string Email { get; set; } = string.Empty;
 
-    public string Role { get; set; } = string.Empty;
+    public string Role { get; set; } = "User";
+
+    public List<string> Roles { get; set; } = new();
 }

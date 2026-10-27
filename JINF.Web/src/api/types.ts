@@ -17,18 +17,28 @@ export interface Location {
   name: string;
 }
 
+
 export interface ItemReport {
-  id: number;
-  reportType: ReportType;
-  title: string;
-  description: string;
-  category: Category;
-  location: Location;
-  eventDate: string; // yyyy-mm-dd
-  status: ItemStatus;
-  createdAt: string;
-  photoUrl?: string;
-  reporterId: string;
+    id: number;
+    reportType: ReportType;
+    title: string;
+    description: string;
+
+    // Nested fields used by the frontend
+    category: Category;
+    location: Location;
+
+    // Flat fields returned by the backend
+    categoryId?: number;
+    categoryName?: string;
+    locationId?: number;
+    locationName?: string;
+
+    eventDate: string;
+    status: ItemStatus;
+    createdAt: string;
+    photoUrl?: string;
+    reporterId: string;
 }
 
 export interface Claim {
@@ -39,15 +49,18 @@ export interface Claim {
   proofOfOwnership: string;
   status: ClaimStatus;
   createdAt: string;
-  decisionReason?: string;
+    decisionReason?: string;
+    itemStatus?: ItemStatus;
 }
 
 export interface User {
-  id: string;
-  fullName: string;
-  email: string;
-  role: Role;
+    id: string;
+    fullName: string;
+    email: string;
+    role: Role;
+    roles?: Role[];
 }
+
 
 export interface ItemFilters {
   q?: string;

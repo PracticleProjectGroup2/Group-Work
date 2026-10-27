@@ -24,10 +24,59 @@ public class ItemController : ControllerBase
     [HttpGet]
     [AllowAnonymous]
     public async Task<IActionResult> GetItems(
+        [FromQuery] string? q,
+        [FromQuery] string? type,
+        [FromQuery] int? categoryId,
+        [FromQuery] int? locationId,
         CancellationToken cancellationToken)
     {
-        var items = await _db.ItemReports
+        var query = _db.ItemReports
             .AsNoTracking()
+            .Where(item => item.Status != ItemStatus.Archived);
+
+        // Filter by Lost or Found.
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            if (!Enum.TryParse<ReportType>(
+                    type, true, out var reportType) ||
+                !Enum.IsDefined(typeof(ReportType), reportType))
+            {
+                return BadRequest(new
+                {
+                    message = "Invalid report type."
+                });
+            }
+
+            query = query.Where(
+                item => item.ReportType == reportType);
+        }
+
+        // Search the item title and description.
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var search = q.Trim().ToLower();
+
+            query = query.Where(item =>
+                item.Title.ToLower().Contains(search) ||
+                item.Description.ToLower().Contains(search));
+        }
+
+        // Filter by category.
+        if (categoryId.HasValue)
+        {
+            query = query.Where(
+                item => item.CategoryId == categoryId.Value);
+        }
+
+        // Filter by location.
+        if (locationId.HasValue)
+        {
+            query = query.Where(
+                item => item.LocationId == locationId.Value);
+        }
+
+        var items = await query
+            .OrderByDescending(item => item.CreatedAt)
             .Select(item => new
             {
                 item.Id,
@@ -46,6 +95,7 @@ public class ItemController : ControllerBase
 
         return Ok(items);
     }
+
 
     // GET: api/items/5
     [HttpGet("{id:int}")]
@@ -152,7 +202,111 @@ public class ItemController : ControllerBase
                 report.CreatedAt
             });
     }
+
+    [HttpGet("mine")]
+    [Authorize]
+    public async Task<IActionResult> GetMyItems(
+        CancellationToken cancellationToken)
+    {
+        var reporterId = User.FindFirstValue(
+            System.Security.Claims.ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(reporterId))
+        {
+            return Unauthorized();
+        }
+
+        var items = await _db.ItemReports
+            .AsNoTracking()
+            .Where(item => item.ReporterId == reporterId)
+            .Select(item => new
+            {
+                item.Id,
+                item.ReportType,
+                item.Title,
+                item.Description,
+                item.CategoryId,
+                CategoryName = item.Category.Name,
+                CategoryIsSensitive = item.Category.IsSensitive,
+                item.LocationId,
+                LocationName = item.Location.Name,
+                item.EventDate,
+                item.Status,
+                item.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(items);
+    }
+
+    // PUT: api/items/5/returned
+    [HttpPut("{id:int}/returned")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> MarkItemReturned(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var adminId = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
+
+        if (string.IsNullOrWhiteSpace(adminId))
+            return Unauthorized();
+
+        await using var transaction =
+            await _db.Database.BeginTransactionAsync(
+                cancellationToken);
+
+        var item = await _db.ItemReports
+            .FirstOrDefaultAsync(
+                item => item.Id == id,
+                cancellationToken);
+
+        if (item is null)
+        {
+            return NotFound(new
+            {
+                message = "Item report not found."
+            });
+        }
+
+        if (item.Status != ItemStatus.Claimed)
+        {
+            return Conflict(new
+            {
+                message =
+                    "Only claimed items can be marked as returned."
+            });
+        }
+
+        item.Status = ItemStatus.Returned;
+        item.ReturnedAt = DateTime.UtcNow;
+
+        var auditEvent = new AuditEvent
+        {
+            ActorId = adminId,
+            Action = "ItemReturned",
+            EntityType = "ItemReport",
+            EntityId = item.Id,
+            OccurredAt = DateTime.UtcNow,
+            Reason = "Item collected by its owner."
+        };
+
+        _db.AuditEvents.Add(auditEvent);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return Ok(new
+        {
+            item.Id,
+            item.Title,
+            Status = item.Status.ToString(),
+            item.ReturnedAt
+        });
+    }
+
 }
+
 
 public class CreateItemRequest
 {

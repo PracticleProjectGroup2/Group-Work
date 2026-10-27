@@ -4,17 +4,52 @@ import * as api from "../../api/client";
 import type { Claim } from "../../api/types";
 import { useAsync } from "../../lib/useAsync";
 import { StatusBadge } from "../../components/Badges";
-import { Empty, PageHeader } from "../../components/ui";
+import { Empty, ErrorNote, PageHeader } from "../../components/ui";
 import { formatDate } from "../../lib/format";
 
 export function AdminPage() {
   const stats = useAsync(api.getStats);
   const claims = useAsync(api.getClaims);
+  const [workingId, setWorkingId] = useState<number | null>(null);
+  const [pickupError, setPickupError] = useState<string | null>(null);
   const refresh = () => { stats.reload(); claims.reload(); };
+  async function markCollected(claim: Claim) {
+  const confirmed = window.confirm(
+    `Confirm that "${claim.itemTitle}" has been handed to ${claim.claimantName}?`
+  );
 
-  const pending = claims.data?.filter((c) => c.status === "Pending") ?? [];
-  const decided = claims.data?.filter((c) => c.status !== "Pending") ?? [];
+  if (!confirmed) return;
 
+  setWorkingId(claim.id);
+  setPickupError(null);
+
+  try {
+    await api.markItemReturned(claim.itemReportId);
+    refresh();
+  } catch (err) {
+    setPickupError(
+      err instanceof Error
+        ? err.message
+        : "Could not record the collection."
+    );
+  } finally {
+    setWorkingId(null);
+  }
+}
+
+  const pending =
+  claims.data?.filter((c) => c.status === "Pending") ?? [];
+
+const awaitingPickup =
+  claims.data?.filter(
+    (c) =>
+      c.status === "Approved" &&
+      c.itemStatus === "Claimed"
+  ) ?? [];
+
+const decided =
+  claims.data?.filter((c) => c.status !== "Pending") ?? [];
+  
   return (
     <>
       <PageHeader title="Reception" />
@@ -33,6 +68,55 @@ export function AdminPage() {
           {pending.map((c) => <ClaimReview key={c.id} claim={c} onDone={refresh} />)}
         </div>
       </section>
+      
+<section className="mt-10">
+  <h2 className="font-semibold mb-3">Awaiting pickup</h2>
+
+  <p className="text-sm text-muted mb-3">
+    Confirm the student's identity and hand over the item
+    before recording the collection.
+  </p>
+
+  {pickupError && <ErrorNote message={pickupError} />}
+
+  {claims.data && awaitingPickup.length === 0 && (
+    <Empty>No items are awaiting pickup.</Empty>
+  )}
+
+  <div className="border-t border-ink">
+    {awaitingPickup.map((claim) => (
+      <div key={claim.id} className="border-b border-line py-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to={`/items/${claim.itemReportId}`}
+            className="font-semibold hover:underline"
+          >
+            {claim.itemTitle}
+          </Link>
+
+          <span className="text-sm text-muted">
+            Collecting student: {claim.claimantName}
+          </span>
+
+          <span className="ml-auto">
+            <StatusBadge status={claim.status} />
+          </span>
+        </div>
+
+        <button
+          className="btn btn-primary mt-3"
+          disabled={workingId !== null}
+          onClick={() => markCollected(claim)}
+        >
+          {workingId === claim.id
+            ? "Recording collection..."
+            : "Mark as collected"}
+        </button>
+      </div>
+    ))}
+  </div>
+</section>
+
 
       {decided.length > 0 && (
         <section className="mt-10">

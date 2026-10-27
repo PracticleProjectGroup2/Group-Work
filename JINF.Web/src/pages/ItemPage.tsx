@@ -16,7 +16,17 @@ export function ItemPage() {
   if (!item) return null;
 
   const sensitive = item.category.isSensitive;
-  const canClaim = user && item.reportType === "Found" && item.status === "Open" && item.reporterId !== user.id;
+  const canClaim =
+  !!user &&
+  item.reportType === "Found" &&
+  item.status === "Open";
+
+  console.log("Claim form diagnostic:", {
+  user,
+  reportType: item.reportType,
+  status: item.status,
+  canClaim,
+});
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
@@ -57,8 +67,17 @@ export function ItemPage() {
             ) : item.status !== "Open" ? (
               "This item is no longer open for claims."
             ) : item.reportType === "Lost" ? (
-              "Found this? Hand it in at reception and report it as found."
+              <div>
+                <p>Looking for your missing item?</p>
+                <Link
+                  to="/?type=Found"
+                  className="text-ink link font-medium mt-2 inline-block"
+                >
+                  Browse Found Items    
+                </Link>
+              </div>
             ) : (
+
               "You reported this item."
             )}
           </div>

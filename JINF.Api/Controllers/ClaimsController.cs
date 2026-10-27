@@ -158,6 +158,7 @@ public class ClaimsController : ControllerBase
                 claim.Id,
                 claim.ItemReportId,
                 ItemTitle = claim.ItemReport.Title,
+                ItemStatus = claim.ItemReport.Status.ToString(),
                 claim.ClaimantId,
                 ClaimantName = claim.Claimant.FullName,
                 claim.ProofOfOwnership,
@@ -240,12 +241,39 @@ public class ClaimsController : ControllerBase
             });
         }
 
+
         claim.Status = request.Status;
         claim.DecisionReason = string.IsNullOrWhiteSpace(reason)
             ? null
             : reason;
         claim.ReviewedById = reviewerId;
         claim.ReviewedAt = DateTime.UtcNow;
+
+        if (request.Status == ClaimStatus.Approved)
+        {
+            var item = await _db.ItemReports
+                .FirstOrDefaultAsync(
+                    item => item.Id == claim.ItemReportId,
+                    cancellationToken);
+
+            if (item is null)
+            {
+                return NotFound(new
+                {
+                    message = "The item associated with this claim was not found."
+                });
+            }
+
+            if (item.Status != ItemStatus.Open)
+            {
+                return Conflict(new
+                {
+                    message = "This item is not available to be claimed."
+                });
+            }
+
+            item.Status = ItemStatus.Claimed;
+        }
 
 
         var auditEvent = new AuditEvent

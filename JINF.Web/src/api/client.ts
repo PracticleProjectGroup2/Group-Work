@@ -102,60 +102,135 @@ export const getLocations = (): Promise<Location[]> => (useMocks ? delay(mock.lo
 
 // ---- Items ----
 
+
 export async function getItems(filters: ItemFilters = {}): Promise<ItemReport[]> {
-  if (useMocks) {
-    const q = filters.q?.toLowerCase().trim();
-    return delay(
-      mock.items.filter(
-        (i) =>
-          i.status !== "Archived" &&
-          (!filters.type || i.reportType === filters.type) &&
-          (!filters.categoryId || i.category.id === filters.categoryId) &&
-          (!filters.locationId || i.location.id === filters.locationId) &&
-          (!q || `${i.title} ${i.description}`.toLowerCase().includes(q)),
-      ),
+    if (useMocks) {
+        const q = filters.q?.toLowerCase().trim();
+
+        return delay(
+            mock.items.filter(
+                (i) =>
+                    i.status !== "Archived" &&
+                    (!filters.type || i.reportType === filters.type) &&
+                    (!filters.categoryId || i.category.id === filters.categoryId) &&
+                    (!filters.locationId || i.location.id === filters.locationId) &&
+                    (!q || `${i.title} ${i.description}`.toLowerCase().includes(q)),
+            ),
+        );
+    }
+
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(
+        ([k, v]) => v !== undefined && v !== "" && params.set(k, String(v)),
     );
-  }
-  const params = new URLSearchParams();
-  Object.entries(filters).forEach(([k, v]) => v !== undefined && v !== "" && params.set(k, String(v)));
-  return request(`/items?${params}`);
+
+    const [items, categories, locations] = await Promise.all([
+        request<any[]>(`/items?${params}`),
+        getCategories(),
+        getLocations(),
+    ]);
+
+    return items.map((item) => ({
+        ...item,
+        category:
+            categories.find((c) => c.id === item.categoryId) ??
+            { id: item.categoryId, name: item.categoryName ?? "Unknown", isSensitive: false },
+        location:
+            locations.find((l) => l.id === item.locationId) ??
+            { id: item.locationId, name: item.locationName ?? "Unknown" },
+    }));
 }
+
 
 export async function getItem(id: number): Promise<ItemReport> {
-  if (useMocks) {
-    const item = mock.items.find((i) => i.id === id);
-    if (!item) throw new Error("Item not found");
-    return delay(item);
-  }
-  return request(`/items/${id}`);
+    if (useMocks) {
+        const item = mock.items.find((i) => i.id === id);
+        if (!item) throw new Error("Item not found");
+        return delay(item);
+    }
+
+    const [item, categories, locations] = await Promise.all([
+        request<any>(`/items/${id}`),
+        getCategories(),
+        getLocations(),
+    ]);
+
+    return {
+        ...item,
+        category:
+            categories.find((c) => c.id === item.categoryId) ??
+            { id: item.categoryId, name: item.categoryName ?? "Unknown", isSensitive: false },
+        location:
+            locations.find((l) => l.id === item.locationId) ??
+            { id: item.locationId, name: item.locationName ?? "Unknown" },
+    };
 }
 
-export async function getMyItems(userId: string): Promise<ItemReport[]> {
-  if (useMocks) return delay(mock.items.filter((i) => i.reporterId === userId));
-  return request("/items/mine");
+
+export async function getMyItems(
+    userId: string
+): Promise<ItemReport[]> {
+    if (useMocks) {
+        return delay(
+            mock.items.filter((item) => item.reporterId === userId)
+        );
+    }
+
+    const [items, categories, locations] = await Promise.all([
+        request<any[]>("/items/mine"),
+        getCategories(),
+        getLocations(),
+    ]);
+
+    return items.map((item) => ({
+        ...item,
+        category:
+            categories.find((c) => c.id === item.categoryId) ?? {
+                id: item.categoryId,
+                name: item.categoryName ?? "Unknown",
+                isSensitive: item.categoryIsSensitive ?? true,
+            },
+        location:
+            locations.find((l) => l.id === item.locationId) ?? {
+                id: item.locationId,
+                name: item.locationName ?? "Unknown",
+            },
+    }));
 }
+
 
 export async function createReport(report: NewReport): Promise<ItemReport> {
-  if (useMocks) {
-    const item: ItemReport = {
-      id: Math.max(...mock.items.map((i) => i.id)) + 1,
-      reportType: report.reportType,
-      title: report.title,
-      description: report.description,
-      category: mock.categories.find((c) => c.id === report.categoryId)!,
-      location: mock.locations.find((l) => l.id === report.locationId)!,
-      eventDate: report.eventDate,
-      status: "Open",
-      createdAt: new Date().toISOString(),
-      reporterId: "u1",
-    };
-    mock.items.unshift(item);
-    return delay(item);
-  }
-  const form = new FormData();
-  Object.entries(report).forEach(([k, v]) => v !== undefined && form.append(k, v instanceof File ? v : String(v)));
-  return request("/items", { method: "POST", body: form });
+    if (useMocks) {
+        const item: ItemReport = {
+            id: Math.max(...mock.items.map((i) => i.id)) + 1,
+            reportType: report.reportType,
+            title: report.title,
+            description: report.description,
+            category: mock.categories.find((c) => c.id === report.categoryId)!,
+            location: mock.locations.find((l) => l.id === report.locationId)!,
+            eventDate: report.eventDate,
+            status: "Open",
+            createdAt: new Date().toISOString(),
+            reporterId: "u1",
+        };
+
+        mock.items.unshift(item);
+        return delay(item);
+    }
+
+    return request("/items", {
+        method: "POST",
+        body: JSON.stringify({
+            reportType: report.reportType,
+            title: report.title,
+            description: report.description,
+            categoryId: report.categoryId,
+            locationId: report.locationId,
+            eventDate: report.eventDate,
+        }),
+    });
 }
+
 
 // ---- Claims ----
 
@@ -169,19 +244,29 @@ export async function createClaim(itemReportId: number, proofOfOwnership: string
   return request("/claims", { method: "POST", body: JSON.stringify({ itemReportId, proofOfOwnership }) });
 }
 
-export const getMyClaims = (): Promise<Claim[]> => (useMocks ? delay(mock.claims.filter((c) => c.claimantName === "Test Student")) : request("/claims/mine"));
+export const getMyClaims = (): Promise<Claim[]> => (useMocks ? delay(mock.claims.filter((c) => c.claimantName === "Test Student")) : request("/claims/my"));
 export const getClaims = (): Promise<Claim[]> => (useMocks ? delay(mock.claims) : request("/claims"));
 
-export async function decideClaim(id: number, approve: boolean, reason?: string): Promise<void> {
-  if (useMocks) {
-    const claim = mock.claims.find((c) => c.id === id)!;
-    claim.status = approve ? "Approved" : "Rejected";
-    claim.decisionReason = reason;
-    if (approve) mock.items.find((i) => i.id === claim.itemReportId)!.status = "Claimed";
-    return delay(undefined);
-  }
-  await request(`/claims/${id}/${approve ? "approve" : "reject"}`, { method: "PUT", body: JSON.stringify({ reason }) });
+export async function markItemReturned(itemId: number): Promise<void> {
+    await request(`/items/${itemId}/returned`, {
+        method: "PUT",
+    });
 }
+
+export async function decideClaim(
+    id: number,
+    approve: boolean,
+    reason?: string
+): Promise<void> {
+    await request(`/claims/${id}/decision`, {
+        method: "PUT",
+        body: JSON.stringify({
+            status: approve ? "Approved" : "Rejected",
+            decisionReason: reason ?? null,
+        }),
+    });
+}
+
 
 // ---- Admin ----
 

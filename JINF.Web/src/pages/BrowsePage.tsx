@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import * as api from "../api/client";
 import type { ReportType } from "../api/types";
 import { useAsync } from "../lib/useAsync";
@@ -14,9 +14,17 @@ const tabs: { value: ReportType | ""; label: string }[] = [
 ];
 
 export function BrowsePage() {
-  const { user } = useAuth();
-  const [q, setQ] = useState("");
-  const [type, setType] = useState<ReportType | "">("Found");
+const { user } = useAuth();
+const [searchParams] = useSearchParams();
+
+const initialType = searchParams.get("type");
+const validInitialType: ReportType | "" =
+  initialType === "Lost" || initialType === "Found"
+    ? initialType
+    : "Found";
+
+const [q, setQ] = useState("");
+const [type, setType] = useState<ReportType | "">(validInitialType);
   const [categoryId, setCategoryId] = useState("");
   const [locationId, setLocationId] = useState("");
 
@@ -26,12 +34,20 @@ export function BrowsePage() {
     () => api.getItems({ q, type: type || undefined, categoryId: Number(categoryId) || undefined, locationId: Number(locationId) || undefined }),
     [q, type, categoryId, locationId],
   );
+  const visibleItems = items.data?.filter(
+  (item) =>
+    item.status !== "Returned" &&
+    item.status !== "Archived"
+  );
 
   return (
     <>
       <PageHeader
         title="Lost and found"
-        meta={items.data && `${items.data.length} item${items.data.length === 1 ? "" : "s"}`}
+       meta={
+          visibleItems &&
+          `${visibleItems.length} item${visibleItems.length === 1 ? "" : "s"}`
+        }
         action={user ? <Link to="/report" className="btn btn-primary">Report an item</Link> : <Link to="/login" className="link text-sm">Log in to report or claim</Link>}
       />
 
@@ -59,9 +75,13 @@ export function BrowsePage() {
         </select>
       </div>
 
-      {items.error && <ErrorNote message={items.error} />}
-      {items.data && items.data.length === 0 && <Empty>Nothing matches. Try fewer filters.</Empty>}
-      {items.data && items.data.length > 0 && <ItemList items={items.data} />}
+      {visibleItems && visibleItems.length === 0 && (
+      <Empty>Nothing matches. Try fewer filters.</Empty>
+      )}
+
+      {visibleItems && visibleItems.length > 0 && (
+      <ItemList items={visibleItems} />
+      )}
     </>
   );
 }
